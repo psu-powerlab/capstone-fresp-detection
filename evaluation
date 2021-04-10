@@ -1,0 +1,205 @@
+# Importing modules needed
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt  # Plotting functions
+from matplotlib.widgets import Button, Cursor, RadioButtons, TextBox, CheckButtons
+import os
+
+# ----------------------------------------------------------------------------------------------------------------------
+# names of the columns for the csv validation set
+headers = ['Event', 'TimeStamp', 'Event Frequency', 'Over Frequency', 'Over Frequency Index',
+           'Under Frequency', 'Under Frequency Index', 'Severity Desc']
+
+# Human event Input values:
+human = [False, True, False, True, False, True, True, False, False, False, True, False, True, True, True, True, True,
+         True, False, True, False, False, False, False, False]
+TimeStamp = []
+radioValue = []
+Frequency_human = []
+
+# function variables
+Freq_h = []
+TimeStamp1 = []
+
+h = 0  # the Human Counter
+dff = pd.DataFrame(columns=headers)
+
+# To update the rows afterwards for validation set
+up_dff = []
+c = 0
+c1 = 0
+
+path1 = r'/Users/ebtehal/PycharmProjects/Capstone' # change the path to yours
+
+# check if human expert exists, by checking if the file exists to begin with.
+found = 0  # binary switch for output file
+for entry in os.scandir(path1):
+    if entry.path.endswith(".xlsx"):
+        found = 1  # set the binary value
+
+if found == 0:
+    user_input = input(
+        '\nNo output file found =(\nIf you want to show plots and input human expert values write "yes" in the '
+        'command window\nIf you want to have placeholder values instead write "no" in the command window\n')
+    if user_input == "yes":
+        human = []  # clear the placeholder array to enter new human expert values
+
+elif found == 1:
+    user_input = input(
+        '\nOutput file found!\nIf  you want to extract information from that file write "yes" in the command '
+        'window\nIf you want to input new human expert values write "no" in the command window\n')
+    if user_input == "yes":
+        df1 = pd.read_excel("output.xlsx", index_col=None)
+        radioValue = df1['Human event type']
+        TimeStamp = df1['Human TimeStamp']
+        human = df1['Human event']
+        Frequency_human = df1['Human Frequency']
+    elif user_input == "no":
+        human = []  # clear the placeholder array to enter new human expert values
+
+# what if there aren't any human values ? done
+# maybe Ask for input again if it doesn't exist
+# or have a prompt saying" Input human values, because there isn't any ", or
+# "Do you want to make an adjustment for the human values"
+# look up the human input one wants to edit via file name
+# enter file name, then show plot, then make the necessary adjusments, smart!!
+# good questions keep em' coming
+
+for entry1 in os.scandir(path1):
+    if entry1.path.endswith(".csv"):
+        fnm = os.path.basename(entry1)
+        df = pd.read_csv(fnm, delimiter=',')
+
+        # name = fnm
+        Full_name = str(fnm)  # + '.csv'
+
+        # reading in the needed data from the csv file
+        df = pd.read_csv(Full_name, delimiter=',')
+        Frequency = df['STATION_1:Freq']
+
+        df = pd.read_csv(Full_name, delimiter=',')
+        Time_stamp = df['Timestamp']
+
+        # Number of sample points
+        N = len(Frequency)
+        T = 1.0 / 220.0  # this is going to represent the length of the spectrum we will use
+        t = np.linspace(0, N * T, N, endpoint=False)  # adjust this to zoom in(55 to 65 Hz)-->(Use ylim instead)
+        Time_stamp_PH = np.linspace(0, len(Frequency), len(Frequency))  # use this as an x-axis as a placeholder while
+                                                                        # fixing the time-stamp issue, PH stands for
+                                                                        # place-holder
+
+        # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        if found == 0 and user_input == "no":
+            radioValue.append('nan')
+            TimeStamp.append('nan')
+            Frequency_human.append('nan')
+
+        if found == 0 and user_input == "yes" or found == 1 and user_input == "no":
+            # interactive plot initiation
+            fig = plt.figure()
+            ax = fig.subplots()
+            plt.subplots_adjust(left=0.2, bottom=0.15)  # the size of the margin the plot
+            p, = ax.plot(Time_stamp_PH, Frequency)
+            plt.title(fnm)
+            plt.grid()
+            plt.ylim([59.85, 60.15])
+
+            ######## create the buttons ########
+            # button 1: event
+            ax_button1 = plt.axes([0.02, 0.6, 0.12, 0.07])  # xposition, yposition, width and height
+            event_button = Button(ax_button1, 'Event', color='red', hovercolor='grey')
+
+
+            def event(val):  # function for on-click action
+                print("Red Button")
+                event_button.color = "Grey"
+                human.append(True)
+
+
+            event_button.on_clicked(event)  # if clicked go to event function above
+
+            # button 2: nonevent
+            ax_button2 = plt.axes([0.02, 0.7, 0.12, 0.07])  # xposition, yposition, width and height
+            nonevent_button = Button(ax_button2, 'non-Event', color='green', hovercolor='grey')
+
+
+            def nonevent(val):  # function for on-click action
+                print("Green Button")
+                nonevent_button.color = "Grey"
+                human.append(False)
+                Frequency_human.append('nan')
+                TimeStamp.append('nan')
+
+
+            nonevent_button.on_clicked(nonevent)  # if clicked go to nonevent function above
+
+            cursor = Cursor(ax, useblit=True, color='red', linewidth=0.5)  # displays a cursor for the user to choose
+                                                                           # the coordinates of the event, we will only
+                                                                           # concern oursleves with the x coordinate
+
+            # radio button: event type
+            ax_radio = plt.axes([0.02, 0.32, 0.13, 0.25])  # xposition, yposition, width and height
+            radio_button = RadioButtons(ax_radio, ['None', 'Over Frequency', 'Under Frequency'], active=0)
+
+
+            # textbox: event time index
+            def submit(text):
+                x_coordinate = int(eval(text))
+                TimeStamp1 = Time_stamp[x_coordinate]
+                TimeStamp.append(TimeStamp1)  # append after the save button is clikced to avoid repetition
+                return TimeStamp
+
+
+            axbox = plt.axes([0.2, 0.02, 0.13, 0.075])  # xposition, yposition, width and height
+            text_box = TextBox(axbox, 'Enter event x-coordinate')
+            text_box.on_submit(submit)  # enter routine for submission
+
+
+            # textbox: event Frequency
+            def submit2(text2):
+                Freq_h = (eval(text2))  # routine for grabbing the variable with the input
+                Frequency_human.append(Freq_h)  # append after the save button is clikced to avoid repetition
+                return Frequency_human
+
+
+            axbox2 = plt.axes([0.5, 0.02, 0.13, 0.075])  # xposition, yposition, width and height
+            text_box2 = TextBox(axbox2, 'Enter Frequency value')
+            text_box2.on_submit(submit2)  # enter routine for submission
+
+            # save button
+            ax_button3 = plt.axes([0.7, 0.02, 0.12, 0.07])  # xposition, yposition, width and height
+            Save_button = Button(ax_button3, 'Save', color='Blue', hovercolor='grey')
+
+
+            def save(val):  # function for on-click action
+                print("Blue Button")
+                # upon clicking the button the following routines will execute:
+                radioValue.append(radio_button.value_selected)
+                plt.close("all")
+
+            Save_button.on_clicked(save)  # close window and move on
+            plt.show()
+
+        ########################{ Saving results in CSV file }#######################
+        if event_button.color == "Grey":
+            # assign each column with the needed values
+            row = {'File Name': Full_name,  # filename where the event was detected
+                   'Human event': human[c],
+                   'Human event type': radioValue[c],
+                   'Human Frequency': Frequency_human[c],
+                   'Human TimeStamp': TimeStamp[c]}
+            up_dff.append(row)  # updates the row
+
+        elif nonevent_button.color == "Grey":
+            # assign each column with the needed values
+            row = {'File Name': Full_name,  # filename of the nonevent'
+                   'Human event': human[c],
+                   'Human event type': radioValue[c],
+                   'Human Frequency': Frequency_human[c],
+                   'Human TimeStamp': TimeStamp[c]}
+            up_dff.append(row)  # updates the row
+        c += 1
+
+        dff = pd.DataFrame(up_dff)
+# saving the dataframe to the CSV file
+dff.to_excel('output.xlsx')
